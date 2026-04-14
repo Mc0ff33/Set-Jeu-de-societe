@@ -131,7 +131,7 @@ class App:
     def __init__(self):
         self._running: bool = True
         self._display_surf: pygame.Surface = None # type: ignore
-        self.size = self.width, self.height = 1000, 600
+        self.size = self.width, self.height = 1000, 700
 
         # Initialisation du moteur de jeu
         self.jeu = Jeu()
@@ -143,8 +143,13 @@ class App:
         # Stockage des 9 PNG blancs
         self.sprites_base: dict[tuple[int, int], pygame.Surface] = {}
 
+        # Rectangle du bouton placé en bas au centre
+        self.rect_bouton: pygame.Rect = pygame.Rect(400, 620, 200, 50) # (x, y, largeur, hauteur)
+        self.police: pygame.font.Font = None # type: ignore
+
     def on_init(self):
         pygame.init()
+        self.police = pygame.font.SysFont(None, 28)
         pygame.display.set_caption("Jeu de SET !")
         self._display_surf = pygame.display.set_mode(self.size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         self._running = True
@@ -216,7 +221,22 @@ class App:
             self.gerer_clic(mouse_pos)
     
     def gerer_clic(self, pos: tuple[int, int]) -> None:
-        """ Calcule quelle carte a été cliquée """
+        """ Calcule si on a cliqué sur un bouton ou sur une carte. """
+
+        # Vérification du bouton "Plus de cartes"
+        if self.rect_bouton.collidepoint(pos):
+            # On vérifie s'il y a déjà un SET sur le plateau
+            if self.jeu.chercher_un_set() is None:
+                if len(self.jeu.paquet) > 0:
+                    print("Aucun SET disponible. Ajout de 3 cartes.")
+                    self.jeu.distribuer(3)
+                else:
+                    print("Le paquet est vide")
+                    self._running = False
+            else:
+                print("Cherchez bien, il y a au moins un SET sur le plateau !")
+            return
+
         for i, carte in enumerate(self.jeu.plateau):
             # On recrée virtuellement le rectangle de la carte pour test de collision
             colonne = i % 4
@@ -231,7 +251,7 @@ class App:
                 else:
                     if len(self.selection) < 3:
                         self.selection.append(carte) # Sélection
-                break
+                return
     
     def on_loop(self):
         """ Vérification des règles et de l'état """
@@ -272,6 +292,18 @@ class App:
             y = MARGE + ligne * (HAUTEUR_CARTE + MARGE)
 
             self.dessiner_carte(carte, x, y)
+        
+
+        # Dessin du bouton
+        couleur_bouton = (200, 200, 200) # Gris clair
+        pygame.draw.rect(self._display_surf, couleur_bouton, self.rect_bouton, border_radius=8)
+        pygame.draw.rect(self._display_surf, (100, 100, 100), self.rect_bouton, width=2, border_radius=8)
+
+        # Rendu du texte
+        if self.police:
+            text_surface: pygame.Surface = self.police.render("Plus de cartes", True, (0, 0, 0))
+            texte_rect: pygame.Rect = text_surface.get_rect(center=self.rect_bouton.center)
+            self._display_surf.blit(text_surface, texte_rect)
         
         pygame.display.flip() # Mise à jour de l'écran
 
