@@ -131,7 +131,7 @@ class App:
     def __init__(self):
         self._running: bool = True
         self._display_surf: pygame.Surface = None # type: ignore
-        self.size = self.width, self.height = 1000, 700
+        self.size = self.width, self.height = 1000, 750
 
         # Initialisation du moteur de jeu
         self.jeu = Jeu()
@@ -144,7 +144,7 @@ class App:
         self.sprites_base: dict[tuple[int, int], pygame.Surface] = {}
 
         # Rectangle du bouton placé en bas au centre
-        self.rect_bouton: pygame.Rect = pygame.Rect(400, 620, 200, 50) # (x, y, largeur, hauteur)
+        self.rect_bouton: pygame.Rect = pygame.Rect(400, 670, 200, 50) # (x, y, largeur, hauteur)
         self.police: pygame.font.Font = None # type: ignore
 
     def on_init(self):
