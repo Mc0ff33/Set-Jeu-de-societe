@@ -1,5 +1,107 @@
+import random
+from itertools import product
 import pygame
 from pygame.locals import *
+
+class Carte:
+    def __init__(self, forme:int, couleur:int, quantite:int, remplissage:int) -> None:
+        """
+        Forme : 0 = Losange, 1 = Ovale, 2 = Vague.
+        Couleur : 0 = Rouge, 1 = Violet, 2 = Vert.
+        Quantité : 0, 1, 2.
+        Remplissage : 0 = Hachuré, 1 = Plein, 2 = Vide.
+        """
+        self.forme = forme
+        self.couleur = couleur
+        self.quantite = quantite
+        self.remplissage = remplissage
+
+    def afficher_texte(self) -> None:
+        f = self.forme
+        c = self.couleur
+        q = self.quantite
+        r = self.remplissage
+        print(f"Carte ({f}, {c}, {q}, {r})")
+
+class Jeu:
+    def __init__(self) -> None:
+        self.paquet: list[Carte] = self._generer_paquet()
+        self.plateau: list[Carte] = []
+        self.melanger()
+
+    def _generer_paquet(self) -> list[Carte]:
+        """ Génère les 81 cartes du jeu. """
+        cartes = []
+        for f, c, q, r in product([0, 1, 2], repeat=4):
+            cartes.append(Carte(f, c, q, r))
+        return cartes
+
+    def melanger(self) -> None:
+        """ Mélange les cartes restantes dans le paquet. """
+        random.shuffle(self.paquet)
+
+    def distribuer(self, nombre=12):
+        """ Tire un nombre donné de cartes du paquet
+        pour les mettre sur le plateau. """
+        for _ in range(nombre):
+            if self.paquet: # On vérifie qu'il reste des cartes
+                self.plateau.append(self.paquet.pop())
+
+    def est_un_set(self, c1:Carte, c2:Carte, c3:Carte) -> bool:
+        """ Vérifie si 3 cartes forme un set valide. """
+        # On regroupe les caractéristiques dans des ensembles (pas de doublons).
+        formes = {c1.forme, c2.forme, c3.forme}
+        couleurs = {c1.couleur, c2.couleur, c3.couleur}
+        quantites = {c1.quantite, c2.quantite, c3.quantite}
+        remplissages = {c1.remplissage, c2.remplissage, c3.remplissage}
+
+        # [On a un set] ssi [la taille de l'ensemble est 1 ou 3]
+        # i.e. les 3 sont identiques ou les 3 sont différents.
+        return (
+            len(formes) in [1, 3] and
+            len(couleurs) in [1, 3] and
+            len(quantites) in [1, 3] and
+            len(remplissages) in [1, 3]
+        )
+    
+    def afficher_plateau(self):
+        print('-' * 32)
+        for carte in self.plateau:
+            carte.afficher_texte()
+
+    def chercher_un_set(self) -> list[Carte] | None:
+        n = len(self.plateau)
+        for i in range(n-2):
+            for j in range(i+1, n-1):
+                for k in range(j+1, n):
+                    c1, c2, c3 = self.plateau[i], self.plateau[j], self.plateau[k]
+                    if self.est_un_set(c1, c2, c3):
+                        return [c1, c2, c3]
+        return None
+    
+    def jouer_seul(self) -> None:
+        partie_en_cours = True
+        
+        while partie_en_cours:
+            self.afficher_plateau()
+            set_trouve = self.chercher_un_set()
+            
+            if set_trouve:
+                print("\n*** SET ! ***")
+                for carte in set_trouve:
+                    carte.afficher_texte()
+                    self.plateau.remove(carte)
+                
+                # On ne complète que si on a moins de 12 cartes sur la table
+                while len(self.plateau) < 12 and len(self.paquet) > 0:
+                    self.distribuer(1)
+            else:
+                if len(self.paquet) > 0:
+                    print("\nPas de set sur le plateau. On ajoute 3 cartes.")
+                    self.distribuer(3)
+                else:
+                    print("\nPlus de set possible et le paquet est vide. Fin de la partie !")
+                    partie_en_cours = False
 
 class App:
     def __init__(self):
@@ -39,5 +141,8 @@ class App:
         self.on_cleanup()
 
 if __name__ == "__main__":
-    theApp = App()
-    theApp.on_execute()
+    # theApp = App()
+    # theApp.on_execute()
+    le_jeu = Jeu()
+    le_jeu.distribuer(12)
+    le_jeu.jouer_seul()
