@@ -154,8 +154,10 @@ class App:
                 chemin_fichier = nom_dossier + '/' + nom_fichier
                 # convert_alpha() permet de conserver la transparence
                 img = pygame.image.load(chemin_fichier).convert_alpha()
+
                 # Redimensionnement de l'image si l'originale est trop grande
-                img = pygame.transform.smoothscale(img, (120, 60))
+                coef = 45 # coef multiplicateur pour ajuster la tailler en conservant le ratio
+                img = pygame.transform.smoothscale(img, (1*coef, 2*coef))
                 self.sprites_base[(f, r)] = img
 
         return True
@@ -179,13 +181,21 @@ class App:
         nb_symboles = carte.quantite + 1
 
         # Affichage des symboles centré verticalement
+        largeur_symbole = sprite_colore.get_width()
         hauteur_symbole = sprite_colore.get_height()
-        espace_total = nb_symboles * hauteur_symbole + (nb_symboles - 1) * 10
-        start_y = y + (HAUTEUR_CARTE - espace_total) // 2
 
-        img_x = x + (LARGEUR_CARTE - sprite_colore.get_width()) // 2
+        # Calcul de la place totale prise en largeur (avec 15px d'espace entre chaque)
+        espace_total = nb_symboles * largeur_symbole + (nb_symboles - 1) * 15
+
+        # Point de départ X pour que le bloc de symboles soit centré
+        start_x = x + (LARGEUR_CARTE - espace_total) // 2
+
+        # Point de départ Y fixe (pour centrer verticalement un seul symbole)
+        img_y = y + (HAUTEUR_CARTE - hauteur_symbole) // 2
+
+        # On dessine de gauche à droite
         for i in range(nb_symboles):
-            img_y = start_y + i * (hauteur_symbole + 10)
+            img_x = start_x + i * (largeur_symbole + 15)
             self._display_surf.blit(sprite_colore, (img_x, img_y))
     
     def on_loop(self):
