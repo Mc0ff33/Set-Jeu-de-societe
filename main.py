@@ -1,7 +1,7 @@
 import random
 from itertools import product
 import pygame
-from pygame.locals import *
+# from pygame.locals import *
 
 class Carte:
     def __init__(self, forme:int, couleur:int, quantite:int, remplissage:int) -> None:
@@ -120,25 +120,28 @@ COULEURS_RGB = {
 LARGEUR_CARTE, HAUTEUR_CARTE = 220, 140
 MARGE = 20
 
-def teinter_image(image_blanche, couleur_rgb):
+def teinter_image(image_blanche: pygame.Surface, couleur_rgb: tuple[int, int, int]) -> pygame.Surface:
     """ Teint une image blanche sur fond transparent. """
-    img_teintee = image_blanche.copy()
+    img_teintee: pygame.Surface = image_blanche.copy()
     # On remplit l'image avec la couleur RGB, en multipliant les pixels
     img_teintee.fill(couleur_rgb, special_flags=pygame.BLEND_RGBA_MULT)
     return img_teintee
 
 class App:
     def __init__(self):
-        self._running = True
-        self._display_surf: pygame.Surface = None
+        self._running: bool = True
+        self._display_surf: pygame.Surface = None # type: ignore
         self.size = self.width, self.height = 1000, 600
 
         # Initialisation du moteur de jeu
         self.jeu = Jeu()
         self.jeu.distribuer(12)
 
+        # Stockage des cartes sélectionnées
+        self.selection: list[Carte] = []
+
         # Stockage des 9 PNG blancs
-        self.sprites_base = {}
+        self.sprites_base: dict[tuple[int, int], pygame.Surface] = {}
 
     def on_init(self):
         pygame.init()
@@ -162,20 +165,25 @@ class App:
 
         return True
 
-    def on_event(self, event):
-        if event.type == pygame.QUIT:
-            self._running = False
-
     def dessiner_carte(self, carte: Carte, x: int, y: int):
-        """ Dessine une carte à la position (x, y) """
-        # Dessin du fond de la carte
+        """ Dessine une carte à la position (x, y) et gère le surlignage. """
+
         rect_carte = pygame.Rect(x, y, LARGEUR_CARTE, HAUTEUR_CARTE)
+
+        # Dessin du fond de la carte
         pygame.draw.rect(self._display_surf, (255, 255, 255), rect_carte, border_radius=10)
-        pygame.draw.rect(self._display_surf, (150, 150, 150), rect_carte, width=2, border_radius=10)
+
+        # Feedback visuel (surlignage)
+        if carte in self.selection:
+            # Bordure bleue épaisse
+            pygame.draw.rect(self._display_surf, (0, 120, 255), rect_carte, width=5, border_radius=10)
+        else:
+            # Bordure grise standard
+            pygame.draw.rect(self._display_surf, (150, 150, 150), rect_carte, width=2, border_radius=10)
 
         # Récupération et teinte du sprite
-        sprite_blanc = self.sprites_base[(carte.forme, carte.remplissage)]
-        sprite_colore = teinter_image(sprite_blanc, COULEURS_RGB[carte.couleur])
+        sprite_blanc: pygame.Surface = self.sprites_base[(carte.forme, carte.remplissage)]
+        sprite_colore: pygame.Surface = teinter_image(sprite_blanc, COULEURS_RGB[carte.couleur])
 
         # Nombre de symboles à afficher sur la carte
         nb_symboles = carte.quantite + 1
@@ -197,6 +205,33 @@ class App:
         for i in range(nb_symboles):
             img_x = start_x + i * (largeur_symbole + 15)
             self._display_surf.blit(sprite_colore, (img_x, img_y))
+
+    def on_event(self, event: pygame.event.Event) -> None:
+        """ Gestion des événements """
+        if event.type == pygame.QUIT:
+            self._running = False
+        
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos: tuple[int, int] = event.pos
+            self.gerer_clic(mouse_pos)
+    
+    def gerer_clic(self, pos: tuple[int, int]) -> None:
+        """ Calcule quelle carte a été cliquée """
+        for i, carte in enumerate(self.jeu.plateau):
+            # On recrée virtuellement le rectangle de la carte pour test de collision
+            colonne = i % 4
+            ligne = i // 4
+            x = MARGE + colonne * (LARGEUR_CARTE + MARGE)
+            y = MARGE + ligne * (HAUTEUR_CARTE + MARGE)
+            rect_carte: pygame.Rect = pygame.Rect(x, y, LARGEUR_CARTE, HAUTEUR_CARTE)
+
+            if rect_carte.collidepoint(pos):
+                if carte in self.selection:
+                    self.selection.remove(carte) # Déselection
+                else:
+                    if len(self.selection) < 3:
+                        self.selection.append(carte) # Sélection
+                break
     
     def on_loop(self):
         pass
