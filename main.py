@@ -234,7 +234,29 @@ class App:
                 break
     
     def on_loop(self):
-        pass
+        """ Vérification des règles et de l'état """
+
+        # On ne déclenche la vérification que si 3 cartes sont sélectionnées
+        if len(self.selection) == 3:
+            c1: Carte = self.selection[0]
+            c2: Carte = self.selection[1]
+            c3: Carte = self.selection[2]
+
+            if self.jeu.est_un_set(c1, c2, c3):
+                print("C'est un SET valide.")
+
+                # On retire les cartes du plateau
+                for carte in self.selection:
+                    self.jeu.plateau.remove(carte)
+                
+                # On complète le plateau (si nécessaire)
+                while len(self.jeu.plateau) < 12 and len(self.jeu.paquet) > 0:
+                    self.jeu.distribuer(1)
+            else:
+                print("Ce n'est pas un SET.")
+            
+            # On vide la sélection
+            self.selection.clear()
 
     def on_render(self):
         # Fond de la fenêtre
