@@ -128,28 +128,31 @@ def teinter_image(image_blanche: pygame.Surface, couleur_rgb: tuple[int, int, in
     return img_teintee
 
 class App:
-    def __init__(self):
+    def __init__(self) -> None:
         self._running: bool = True
         self._display_surf: pygame.Surface = None # type: ignore
         self.size = self.width, self.height = 1000, 750
 
+        # Etat du jeu
+        self.etat_jeu = "EN_COURS"
+
         # Initialisation du moteur de jeu
         self.jeu = Jeu()
         self.jeu.distribuer(12)
+        self.selection: list[Carte] = []                                # Stockage des cartes sélectionnées
+        self.sprites_base: dict[tuple[int, int], pygame.Surface] = {}   # Stockage des 9 PNG blancs
 
-        # Stockage des cartes sélectionnées
-        self.selection: list[Carte] = []
-
-        # Stockage des 9 PNG blancs
-        self.sprites_base: dict[tuple[int, int], pygame.Surface] = {}
-
-        # Rectangle du bouton placé en bas au centre
+        # Boutons et polices
         self.rect_bouton: pygame.Rect = pygame.Rect(400, 670, 200, 50) # (x, y, largeur, hauteur)
-        self.police: pygame.font.Font = None # type: ignore
+        self.rect_bouton_rejouer: pygame.Rect = pygame.Rect(400, 400, 200, 60)
 
-    def on_init(self):
+        self.police: pygame.font.Font = None # type: ignore
+        self.police_titre: pygame.font.Font = None # type: ignore
+
+    def on_init(self) -> bool:
         pygame.init()
         self.police = pygame.font.SysFont(None, 28)
+        self.police_titre = pygame.font.SysFont(None, 72)
         pygame.display.set_caption("Jeu de SET !")
         self._display_surf = pygame.display.set_mode(self.size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         self._running = True
@@ -222,6 +225,12 @@ class App:
     
     def gerer_clic(self, pos: tuple[int, int]) -> None:
         """ Calcule si on a cliqué sur un bouton ou sur une carte. """
+        
+        # Si la partie est terminée
+        if self.etat_jeu == "TERMINE":
+            if self.rect_bouton_rejouer.collidepoint(pos):
+                self.reinitialiser_partie()
+            return
 
         # Vérification du bouton "Plus de cartes"
         if self.rect_bouton.collidepoint(pos):
@@ -237,6 +246,7 @@ class App:
                 print("Cherchez bien, il y a au moins un SET sur le plateau !")
             return
 
+        # Calcule quelle carte a été cliquée
         for i, carte in enumerate(self.jeu.plateau):
             # On recrée virtuellement le rectangle de la carte pour test de collision
             colonne = i % 4
@@ -277,6 +287,11 @@ class App:
             
             # On vide la sélection
             self.selection.clear()
+        
+        # Vérification fin de partie
+        if self.etat_jeu == "EN_COURS":
+            if len(self.jeu.paquet) == 0 and self.jeu.chercher_un_set() is None:
+                self.etat_jeu = "TERMINE"
 
     def on_render(self):
         # Fond de la fenêtre
@@ -304,8 +319,39 @@ class App:
             text_surface: pygame.Surface = self.police.render("Plus de cartes", True, (0, 0, 0))
             texte_rect: pygame.Rect = text_surface.get_rect(center=self.rect_bouton.center)
             self._display_surf.blit(text_surface, texte_rect)
+
+        # Affiche conditionnel de l'écran de fin
+        if self.etat_jeu == "TERMINE":
+            # Voile noir semi-transparent
+            overlay: pygame.Surface = pygame.Surface(self.size, pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 180)) # Le dernier élément du quadruplet quantifie la transparence
+            self._display_surf.blit(overlay, (0, 0))
+
+            # Titre de fin
+            if self.police_titre:
+                texte_fin = self.police_titre.render("Partie terminée !", True, (255, 255, 255))
+                rect_fin = texte_fin.get_rect(center=(self.width // 2, self.height // 2 - 80))
+                self._display_surf.blit(texte_fin, rect_fin)
+
+            # Bouton Rejouer
+            couleur_btn_rejouer: tuple[int, int, int] = (255, 200, 50) # Orange/Jaune
+            pygame.draw.rect(self._display_surf, couleur_btn_rejouer, self.rect_bouton_rejouer, border_radius=10)
+            pygame.draw.rect(self._display_surf, (255, 255, 255), self.rect_bouton_rejouer, width=3, border_radius=10)
+
+            if self.police:
+                texte_rejouer = self.police.render("Rejouer", True, (0, 0, 0))
+                rect_rejouer_texte = texte_rejouer.get_rect(center=self.rect_bouton_rejouer.center)
+                self._display_surf.blit(texte_rejouer, rect_rejouer_texte)
         
         pygame.display.flip() # Mise à jour de l'écran
+
+    def reinitialiser_partie(self) -> None:
+        """ Relance un toute nouvelle partie. """
+        self.jeu = Jeu()
+        self.jeu.distribuer(12)
+        self.selection.clear()
+        self.etat_jeu = "EN_COURS"
+        print("\n--- NOUVELLE PARTIE ---")
 
     def on_cleanup(self):
         pygame.quit()
