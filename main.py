@@ -103,27 +103,110 @@ class Jeu:
                     print("\nPlus de set possible et le paquet est vide. Fin de la partie !")
                     partie_en_cours = False
 
+
+
+# Constantes visuelles
+NOMS_FORMES = {0: "losange", 1: "ovale", 2: "vague"}
+NOMS_REMPLISSAGES = {0: "hachure", 1: "plein", 2: "vide"}
+
+# Couleurs RGB
+COULEURS_RGB = {
+    0: (238, 29, 35),   # Rouge
+    1: (72, 46, 146),   # Violet
+    2: (33, 178, 89)    # Vert
+}
+
+# Dimensions
+LARGEUR_CARTE, HAUTEUR_CARTE = 220, 140
+MARGE = 20
+
+def teinter_image(image_blanche, couleur_rgb):
+    """ Teint une image blanche sur fond transparent. """
+    img_teintee = image_blanche.copy()
+    # On remplit l'image avec la couleur RGB, en multipliant les pixels
+    img_teintee.fill(couleur_rgb, special_flags=pygame.BLEND_RGBA_MULT)
+    return img_teintee
+
 class App:
     def __init__(self):
         self._running = True
-        self._display_surf = None
-        self.size = self.width, self.height = 640, 400
+        self._display_surf: pygame.Surface = None
+        self.size = self.width, self.height = 1000, 600
+
+        # Initialisation du moteur de jeu
+        self.jeu = Jeu()
+        self.jeu.distribuer(12)
+
+        # Stockage des 9 PNG blancs
+        self.sprites_base = {}
 
     def on_init(self):
         pygame.init()
+        pygame.display.set_caption("Jeu de SET !")
         self._display_surf = pygame.display.set_mode(self.size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         self._running = True
+
+        # Chargement en mémoire des 9 images
+        nom_dossier = 'resources/cards'
+        for f in [0, 1, 2]:
+            for r in [0, 1, 2]:
+                nom_fichier = f"{NOMS_FORMES[f]}_{NOMS_REMPLISSAGES[r]}.png"
+                chemin_fichier = nom_dossier + '/' + nom_fichier
+                # convert_alpha() permet de conserver la transparence
+                img = pygame.image.load(chemin_fichier).convert_alpha()
+                # Redimensionnement de l'image si l'originale est trop grande
+                img = pygame.transform.smoothscale(img, (120, 60))
+                self.sprites_base[(f, r)] = img
+
         return True
 
     def on_event(self, event):
         if event.type == pygame.QUIT:
             self._running = False
+
+    def dessiner_carte(self, carte: Carte, x: int, y: int):
+        """ Dessine une carte à la position (x, y) """
+        # Dessin du fond de la carte
+        rect_carte = pygame.Rect(x, y, LARGEUR_CARTE, HAUTEUR_CARTE)
+        pygame.draw.rect(self._display_surf, (255, 255, 255), rect_carte, border_radius=10)
+        pygame.draw.rect(self._display_surf, (150, 150, 150), rect_carte, width=2, border_radius=10)
+
+        # Récupération et teinte du sprite
+        sprite_blanc = self.sprites_base[(carte.forme, carte.remplissage)]
+        sprite_colore = teinter_image(sprite_blanc, COULEURS_RGB[carte.couleur])
+
+        # Nombre de symboles à afficher sur la carte
+        nb_symboles = carte.quantite + 1
+
+        # Affichage des symboles centré verticalement
+        hauteur_symbole = sprite_colore.get_height()
+        espace_total = nb_symboles * hauteur_symbole + (nb_symboles - 1) * 10
+        start_y = y + (HAUTEUR_CARTE - espace_total) // 2
+
+        img_x = x + (LARGEUR_CARTE - sprite_colore.get_width()) // 2
+        for i in range(nb_symboles):
+            img_y = start_y + i * (hauteur_symbole + 10)
+            self._display_surf.blit(sprite_colore, (img_x, img_y))
     
     def on_loop(self):
         pass
 
     def on_render(self):
-        pass
+        # Fond de la fenêtre
+        self._display_surf.fill((230, 240, 250))
+
+        # Dessiner toutes les cartes du plateau
+        for i, carte in enumerate(self.jeu.plateau):
+            # Calcul de la colonne (x) et de la ligne (y) pour une grille 4x3
+            colonne = i % 4
+            ligne = i // 4
+
+            x = MARGE + colonne * (LARGEUR_CARTE + MARGE)
+            y = MARGE + ligne * (HAUTEUR_CARTE + MARGE)
+
+            self.dessiner_carte(carte, x, y)
+        
+        pygame.display.flip() # Mise à jour de l'écran
 
     def on_cleanup(self):
         pygame.quit()
@@ -141,8 +224,5 @@ class App:
         self.on_cleanup()
 
 if __name__ == "__main__":
-    # theApp = App()
-    # theApp.on_execute()
-    le_jeu = Jeu()
-    le_jeu.distribuer(12)
-    le_jeu.jouer_seul()
+    the_app = App()
+    the_app.on_execute()
