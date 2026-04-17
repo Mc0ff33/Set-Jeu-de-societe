@@ -1,11 +1,10 @@
-# ---------------------
-# VERSION WEB DU PROJET
-# ---------------------
+# ------------------------
+# VERSION LOCALE DU PROJET
+# ------------------------
 
 import random
 from itertools import product
 import pygame
-import asyncio # Pour Pygbag
 
 class Carte:
     def __init__(self, forme:int, couleur:int, quantite:int, remplissage:int) -> None:
@@ -420,7 +419,7 @@ class App:
             self.dernier_coup_pc = temps_actuel
         # --- --------------- ---
 
-    async def on_execute(self):
+    def on_execute(self):
         if self.on_init() == False:
             self._running = False
 
@@ -428,16 +427,14 @@ class App:
             for event in pygame.event.get():
                 self.on_event(event)
             
-            # self.pc_plays()
+            self.pc_plays()
             
             self.on_loop()
             self.on_render()
             pygame.time.Clock().tick(60)
-
-            await asyncio.sleep(0)
         
         self.on_cleanup()
 
 if __name__ == "__main__":
     the_app = App()
-    asyncio.run(the_app.on_execute())
+    the_app.on_execute()
