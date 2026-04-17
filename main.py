@@ -48,7 +48,18 @@ class Jeu:
                 self.plateau.append(self.paquet.pop())
 
     def est_un_set(self, c1:Carte, c2:Carte, c3:Carte) -> bool:
-        """ Vérifie si 3 cartes forme un set valide. """
+        """ Vérifie si 3 cartes forment un set valide.
+        Utilise l'arithmétique sur le corps fini (Z/3Z)^4. """
+        f = (c1.forme + c2.forme + c3.forme) % 3
+        c = (c1.couleur + c2.couleur + c3.couleur) % 3
+        q = (c1.quantite + c2.quantite + c3.quantite) % 3
+        r = (c1.remplissage + c2.remplissage + c3.remplissage) % 3
+
+        return (f, c, q, r) == (0, 0, 0, 0)
+    
+    def est_un_set_ensemblise(self, c1:Carte, c2:Carte, c3:Carte) -> bool:
+        """ Vérifie si 3 cartes forment un set valide.
+        Utilise l'objet `set` de Python. """
         # On regroupe les caractéristiques dans des ensembles (pas de doublons).
         formes = {c1.forme, c2.forme, c3.forme}
         couleurs = {c1.couleur, c2.couleur, c3.couleur}
@@ -79,6 +90,33 @@ class Jeu:
                         return [c1, c2, c3]
         return None
     
+    def remplacer_set(self, cartes_a_retirer: list[Carte]) -> None:
+        """ 
+        Remplace les cartes d'un SET par de nouvelles cartes du paquet à la même place,
+        ou réduit la taille du plateau si on a plus de 12 cartes ou si le paquet est vide. 
+        """
+        
+        indices = [self.plateau.index(c) for c in cartes_a_retirer]
+        indices.sort(reverse=True) # pour ne pas fausser les indices en cas de pop()
+        
+        for i in indices:
+            # Le plateau est étendu (15 cartes ou plus)
+            # On prend la toute dernière carte du plateau pour boucher le trou.
+            if len(self.plateau) > 12:
+                derniere_carte = self.plateau.pop()
+                # On s'assure que la carte à remplacer n'était pas elle-même 
+                # la dernière carte qu'on vient juste de pop()
+                if i < len(self.plateau): 
+                    self.plateau[i] = derniere_carte
+                    
+            # Plateau classique de 12 cartes, on pioche pour remplacer
+            elif len(self.paquet) > 0:
+                self.plateau[i] = self.paquet.pop()
+                
+            # Fin de partie (paquet vide), on supprime juste la carte
+            else:
+                self.plateau.pop(i)
+    
     def jouer_seul(self) -> None:
         partie_en_cours = True
         
@@ -90,11 +128,9 @@ class Jeu:
                 print("\n*** SET ! ***")
                 for carte in set_trouve:
                     carte.afficher_texte()
-                    self.plateau.remove(carte)
                 
-                # On ne complète que si on a moins de 12 cartes sur la table
-                while len(self.plateau) < 12 and len(self.paquet) > 0:
-                    self.distribuer(1)
+                # On remplace les cartes
+                self.remplacer_set(set_trouve)
             else:
                 if len(self.paquet) > 0:
                     print("\nPas de set sur le plateau. On ajoute 3 cartes.")
@@ -170,6 +206,14 @@ class App:
                 coef = 45 # coef multiplicateur pour ajuster la tailler en conservant le ratio
                 img = pygame.transform.smoothscale(img, (1*coef, 2*coef))
                 self.sprites_base[(f, r)] = img
+        
+        # --- Gestion du temps de jeu du PC ---
+        self.dernier_coup_pc = 0
+        self.delai_pc = 4000
+
+        # Chrono pour laisser le temps de voir les cartes sélectionnées
+        self.temps_validation = 0
+        self.delai_validation = 1500
 
         return True
 
@@ -223,6 +267,15 @@ class App:
             mouse_pos: tuple[int, int] = event.pos
             self.gerer_clic(mouse_pos)
     
+    def get_card_coordinates(self, i: int) -> tuple[int, int]:
+        """ Renvoie les coordonnées (x, y) de la i-ème carte du plateau. """
+        # Calcul de la colonne (x) et de la ligne (y) pour une grille 4x3
+        colonne = i % 4
+        ligne = i // 4
+        x = MARGE + colonne * (LARGEUR_CARTE + MARGE)
+        y = MARGE + ligne * (HAUTEUR_CARTE + MARGE)
+        return (x, y)
+
     def gerer_clic(self, pos: tuple[int, int]) -> None:
         """ Calcule si on a cliqué sur un bouton ou sur une carte. """
         
@@ -249,10 +302,7 @@ class App:
         # Calcule quelle carte a été cliquée
         for i, carte in enumerate(self.jeu.plateau):
             # On recrée virtuellement le rectangle de la carte pour test de collision
-            colonne = i % 4
-            ligne = i // 4
-            x = MARGE + colonne * (LARGEUR_CARTE + MARGE)
-            y = MARGE + ligne * (HAUTEUR_CARTE + MARGE)
+            x, y = self.get_card_coordinates(i)
             rect_carte: pygame.Rect = pygame.Rect(x, y, LARGEUR_CARTE, HAUTEUR_CARTE)
 
             if rect_carte.collidepoint(pos):
@@ -268,25 +318,25 @@ class App:
 
         # On ne déclenche la vérification que si 3 cartes sont sélectionnées
         if len(self.selection) == 3:
-            c1: Carte = self.selection[0]
-            c2: Carte = self.selection[1]
-            c3: Carte = self.selection[2]
+            if self.temps_validation == 0:
+                self.temps_validation = pygame.time.get_ticks()
 
-            if self.jeu.est_un_set(c1, c2, c3):
-                print("C'est un SET valide.")
 
-                # On retire les cartes du plateau
-                for carte in self.selection:
-                    self.jeu.plateau.remove(carte)
+            elif pygame.time.get_ticks() - self.temps_validation > self.delai_validation:
+                c1: Carte = self.selection[0]
+                c2: Carte = self.selection[1]
+                c3: Carte = self.selection[2]
+
+                if self.jeu.est_un_set(c1, c2, c3):
+                    print("C'est un SET valide.")
+                    # On remplace les cartes
+                    self.jeu.remplacer_set(self.selection)
+                else:
+                    print("Ce n'est pas un SET.")
                 
-                # On complète le plateau (si nécessaire)
-                while len(self.jeu.plateau) < 12 and len(self.jeu.paquet) > 0:
-                    self.jeu.distribuer(1)
-            else:
-                print("Ce n'est pas un SET.")
-            
-            # On vide la sélection
-            self.selection.clear()
+                # On vide la sélection
+                self.selection.clear()
+                self.temps_validation = 0
         
         # Vérification fin de partie
         if self.etat_jeu == "EN_COURS":
@@ -299,13 +349,7 @@ class App:
 
         # Dessiner toutes les cartes du plateau
         for i, carte in enumerate(self.jeu.plateau):
-            # Calcul de la colonne (x) et de la ligne (y) pour une grille 4x3
-            colonne = i % 4
-            ligne = i // 4
-
-            x = MARGE + colonne * (LARGEUR_CARTE + MARGE)
-            y = MARGE + ligne * (HAUTEUR_CARTE + MARGE)
-
+            x, y = self.get_card_coordinates(i)
             self.dessiner_carte(carte, x, y)
         
 
@@ -356,6 +400,22 @@ class App:
     def on_cleanup(self):
         pygame.quit()
 
+    def pc_plays(self) -> None:
+        temps_actuel = pygame.time.get_ticks()
+
+        if len(self.selection) == 3:
+            return
+
+        if temps_actuel - self.dernier_coup_pc > self.delai_pc:
+            set_trouve = self.jeu.chercher_un_set()
+            if set_trouve:
+                self.selection = set_trouve.copy()
+            else:
+                self.gerer_clic((self.rect_bouton.left, self.rect_bouton.top))
+            
+            self.dernier_coup_pc = temps_actuel
+        # --- --------------- ---
+
     def on_execute(self):
         if self.on_init() == False:
             self._running = False
@@ -363,8 +423,12 @@ class App:
         while self._running:
             for event in pygame.event.get():
                 self.on_event(event)
+            
+            self.pc_plays()
+            
             self.on_loop()
             self.on_render()
+            pygame.time.Clock().tick(60)
         
         self.on_cleanup()
 
